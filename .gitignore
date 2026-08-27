@@ -1,0 +1,14 @@
+# dependencies(绝不入库)
+node_modules/
+
+# logs / env / os
+*.log
+npm-debug.log*
+Typora_Hook_Log.txt
+.env
+.env.local
+.DS_Store
+Thumbs.db
+
+# 注:lib/(tsc 构建产物)必须入库——cordis.patch.yml 的 bundle 条目
+# name: './lib/index.js' 依赖它加载;发布后 plugin add 需要此目录

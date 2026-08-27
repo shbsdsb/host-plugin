@@ -1,0 +1,24 @@
+{
+  "name": "host-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "前端基础插件 host(测试版):node:http 本地 HTTP 服务器 + st host go/close",
+  "main": "lib/index.js",
+  "ts": { "bundle": { "patch": "./cordis.patch.yml" } },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "cordis": "^4.0.0-rc.8",
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.3",
+    "vitest": "^4.1.11"
+  }
+}

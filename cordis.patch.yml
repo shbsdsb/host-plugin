@@ -1,0 +1,3 @@
+# host bundle patch:插件条目(config 覆盖挂载点)
+- id: host
+  name: './lib/index.js'
