@@ -14,14 +14,12 @@ vi.mock('../src/win.ts', () => ({
 
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(() => ({ status: 0 })),
-  spawn: vi.fn(() => ({ unref: vi.fn() })),
   execFileSync: vi.fn(() => ''),
 }))
 
-import { spawnSync, spawn, execFileSync } from 'node:child_process'
+import { spawnSync, execFileSync } from 'node:child_process'
 import { portInUse, taskkillPid, parseListeningPids } from '../src/win.ts'
 const mockSpawnSync = vi.mocked(spawnSync)
-const mockSpawn = vi.mocked(spawn)
 const mockExecFileSync = vi.mocked(execFileSync)
 const mockPortInUse = vi.mocked(portInUse)
 const mockTaskkill = vi.mocked(taskkillPid)
@@ -47,9 +45,8 @@ function makeCtx(stHome: string): { ctx: CliContext; out: string[]; err: string[
 describe('host main', () => {
   beforeEach(() => {
     mockPortInUse.mockReset(); mockTaskkill.mockReset(); mockParse.mockReset()
-    mockSpawnSync.mockReset(); mockSpawn.mockReset(); mockExecFileSync.mockReset()
+    mockSpawnSync.mockReset(); mockExecFileSync.mockReset()
     mockSpawnSync.mockReturnValue({ status: 0 } as never)
-    mockSpawn.mockReturnValue({ unref: vi.fn() } as never)
     mockExecFileSync.mockReturnValue('')
   })
 
@@ -68,28 +65,28 @@ describe('host main', () => {
     expect(err.join('\n')).toContain('已被占用')
   })
 
-  it('go 成功:show=true 走 start 窗口分支,输出启动信息', async () => {
+  it('go 前台阻塞运行 bootstrap(stdio inherit,ST_HOST_START=true,透传退出码)', async () => {
     const stHome = await makeStHome()
-    const { ctx, out, err } = makeCtx(stHome)
-    expect(await main(['go'], ctx)).toBe(0)
+    const { ctx, out } = makeCtx(stHome)
+    ctx.env.ST_BOOTSTRAP = 'D:/x/bootstrap/src/index.ts'
+    mockSpawnSync.mockReturnValue({ status: 3 } as never)
+    expect(await main(['go'], ctx)).toBe(3)
     expect(mockSpawnSync).toHaveBeenCalledWith(
-      'cmd',
-      expect.arrayContaining(['start', '"Host"']),
-      expect.anything(),
+      'node',
+      ['D:/x/bootstrap/src/index.ts'],
+      expect.objectContaining({ stdio: 'inherit' }),
     )
-    expect(mockSpawn).not.toHaveBeenCalled() // show=true 不 spawn 隐藏进程
-    expect(out.join('\n')).toContain('Host 已启动')
-    expect(err).toEqual([])
+    const env = (mockSpawnSync.mock.calls[0][2] as { env: Record<string, string> }).env
+    expect(env.ST_HOST_START).toBe('true')
+    expect(env.ST_HOST_PORT).toBe('3000')
+    expect(out.join('\n')).toBe('')
   })
 
-  it('go show=false 走隐藏后台 spawn 分支', async () => {
+  it('go ST_BOOTSTRAP 缺失报错 exit 1', async () => {
     const stHome = await makeStHome()
-    await writeFile(join(stHome, 'cordis.patch.yml'), '- id: host\n  config:\n    show: false\n')
-    const { ctx, out } = makeCtx(stHome)
-    expect(await main(['go'], ctx)).toBe(0)
-    expect(mockSpawnSync).not.toHaveBeenCalled()
-    expect(mockSpawn).toHaveBeenCalledWith('node', expect.anything(), expect.objectContaining({ windowsHide: true }))
-    expect(out.join('\n')).toContain('Host 已启动')
+    const { ctx, err } = makeCtx(stHome)
+    expect(await main(['go'], ctx)).toBe(1)
+    expect(err.join('\n')).toContain('ST_BOOTSTRAP')
   })
 
   it('close:解析 netstat PID 并逐个 taskkill', async () => {

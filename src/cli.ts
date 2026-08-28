@@ -1,11 +1,10 @@
 // agent_plugin_dev/host-plugin/src/cli.ts
-import { fileURLToPath } from 'node:url'
-import { spawnSync, spawn, execFileSync } from 'node:child_process'
+import { spawnSync, execFileSync } from 'node:child_process'
 import { loadConfig } from './config.ts'
 import { parseListeningPids, portInUse, taskkillPid } from './win.ts'
 import type { CliContext } from './types.ts'
 
-export const description = 'Host 服务器管理:go(启动)/close(关闭)'
+export const description = 'Host 服务器管理:go(终端阻塞启动)/close(关闭)'
 
 export async function main(args: string[], ctx: CliContext): Promise<number> {
   const [sub, ...rest] = args
@@ -28,6 +27,14 @@ function requireStHome(ctx: CliContext): string {
   return stHome
 }
 
+function requireBootstrapEntry(ctx: CliContext): string {
+  const entry = ctx.env.ST_BOOTSTRAP
+  if (!entry) {
+    throw new Error('ST_BOOTSTRAP 未设置(请通过最新版 st CLI 调度,或手动设置 ST_BOOTSTRAP 指向 bootstrap/src/index.ts)')
+  }
+  return entry
+}
+
 async function go(ctx: CliContext): Promise<number> {
   try {
     const stHome = requireStHome(ctx)
@@ -37,35 +44,26 @@ async function go(ctx: CliContext): Promise<number> {
       ctx.io.stderr(`错误: 端口 ${cfg.port} 已被占用`)
       return 1
     }
-    // 入口跟随当前文件扩展名:src 直跑(.ts)与 lib 构建产物(.js)都正确
-    const ext = import.meta.url.endsWith('.ts') ? '.ts' : '.js'
-    const serverPath = fileURLToPath(new URL(`./server${ext}`, import.meta.url))
-    const env = {
-      ...process.env,
-      ST_HOST_HOST: cfg.host,
-      ST_HOST_PORT: String(cfg.port),
-      ST_HOST_LISTEN: String(cfg.listen),
-      ST_HOST_LISTEN_WHITELIST: JSON.stringify(cfg.listenWhitelist),
-      ST_HOST_OPEN: String(cfg.open),
+    const entry = requireBootstrapEntry(ctx)
+    // 前台阻塞运行完整 cordis 插件树(终端阻塞):stdio 继承共享控制台,
+    // Ctrl+C 传递给子进程;子进程退出码透传
+    const r = spawnSync('node', [entry], {
+      stdio: 'inherit',
+      env: {
+        ...process.env,
+        ST_HOST_START: 'true',
+        ST_HOST_HOST: cfg.host,
+        ST_HOST_PORT: String(cfg.port),
+        ST_HOST_LISTEN: String(cfg.listen),
+        ST_HOST_LISTEN_WHITELIST: JSON.stringify(cfg.listenWhitelist),
+        ST_HOST_OPEN: String(cfg.open),
+      },
+    })
+    if (r.error) {
+      ctx.io.stderr(`错误: 启动 bootstrap 失败 ${r.error.message}`)
+      return 1
     }
-    if (cfg.show) {
-      // 独立终端窗口:start "Host" cmd /k node <server.ts>
-      const r = spawnSync('cmd', ['/c', 'start', '"Host"', 'cmd', '/k', 'node', serverPath], {
-        env,
-        cwd: process.cwd(),
-        stdio: 'ignore',
-      })
-      if (r.error) {
-        ctx.io.stderr(`错误: 启动 Host 窗口失败 ${r.error.message}`)
-        return 1
-      }
-    } else {
-      // 隐藏后台进程
-      const child = spawn('node', [serverPath], { env, stdio: 'ignore', windowsHide: true, detached: true })
-      child.unref()
-    }
-    ctx.io.stdout(`Host 已启动: http://${cfg.host}:${cfg.port}`)
-    return 0
+    return r.status ?? 1
   } catch (e) {
     ctx.io.stderr(`错误: ${e instanceof Error ? e.message : String(e)}`)
     return 1
