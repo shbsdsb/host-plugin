@@ -89,6 +89,19 @@ describe('host main', () => {
     expect(err.join('\n')).toContain('ST_BOOTSTRAP')
   })
 
+  it('go 透传 ctx.env(含 .env 的 ST_HOME/ST_PROFILE)给子进程', async () => {
+    const stHome = await makeStHome()
+    delete process.env.ST_HOME // 模拟 ST_HOME 仅存在于 .env(loadEnv 并入 ctx.env,不写回 process.env)
+    delete process.env.ST_PROFILE
+    const { ctx } = makeCtx(stHome)
+    ctx.env.ST_BOOTSTRAP = 'D:/x/bootstrap/src/index.ts'
+    ctx.env.ST_PROFILE = 'prod'
+    expect(await main(['go'], ctx)).toBe(0)
+    const env = (mockSpawnSync.mock.calls[0][2] as { env: Record<string, string> }).env
+    expect(env.ST_HOME).toBe(stHome)
+    expect(env.ST_PROFILE).toBe('prod')
+  })
+
   it('close:解析 netstat PID 并逐个 taskkill', async () => {
     const stHome = await makeStHome()
     mockParse.mockReturnValue([12345, 54321])
