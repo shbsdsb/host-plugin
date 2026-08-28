@@ -5,23 +5,23 @@ import { tmpdir } from 'node:os'
 import { resolve, join } from 'node:path'
 import { Context } from 'cordis'
 import { name, apply } from '../src/index.ts'
-import { WebserverService } from '../src/webserver.ts'
+import { WebServerService } from '../src/web-server.ts'
 import { DEFAULT_CONFIG } from '../src/config.ts'
 
 vi.mock('node:child_process', () => ({
   execFileSync: vi.fn(),
 }))
 
-vi.mock('../src/webserver.ts', () => {
+vi.mock('../src/web-server.ts', () => {
   const start = vi.fn().mockResolvedValue(undefined)
   const stop = vi.fn().mockResolvedValue(undefined)
-  class FakeWebserverService {
+  class FakeWebServerService {
     start = start
     stop = stop
     get listening() { return false }
     get server() { return { address: () => ({ port: 0 }) } }
   }
-  return { WebserverService: FakeWebserverService }
+  return { WebServerService: FakeWebServerService }
 })
 
 import { execFileSync } from 'node:child_process'
@@ -66,7 +66,7 @@ describe('host plugin', () => {
       'host',
       expect.objectContaining({ config: DEFAULT_CONFIG }),
     )
-    expect((ctx as { provide: ReturnType<typeof vi.fn> }).provide).toHaveBeenCalledWith('webserver', expect.any(WebserverService))
+    expect((ctx as { provide: ReturnType<typeof vi.fn> }).provide).toHaveBeenCalledWith('webserver', expect.any(WebServerService))
   })
 
   it('apply 读取 $ST_HOME patch 覆盖配置', async () => {

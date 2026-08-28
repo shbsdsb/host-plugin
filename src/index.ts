@@ -3,14 +3,14 @@ import { execFileSync } from 'node:child_process'
 import { Context } from 'cordis'
 import { loadConfig, DEFAULT_CONFIG, resolveListenTarget } from './config.ts'
 import type { HostConfig } from './config.ts'
-import { WebserverService } from './webserver.ts'
+import { WebServerService } from './web-server.ts'
 
 declare module 'cordis' {
   interface Context {
     /** host service 骨架(配置) */
     host: { config: HostConfig }
     /** host 提供的 HTTP 路由服务:其他插件通过 inject: ['webserver'] 注册路由 */
-    webserver: WebserverService
+    webserver: WebServerService
   }
 }
 
@@ -22,7 +22,7 @@ export function apply(ctx: Context) {
   const config = stHome ? loadConfig(stHome, profile) : { ...DEFAULT_CONFIG }
   ctx.provide('host', { config })
 
-  const webserver = new WebserverService()
+  const webserver = new WebServerService()
   ctx.provide('webserver', webserver)
   ctx.effect(() => async () => {
     await webserver.stop()
