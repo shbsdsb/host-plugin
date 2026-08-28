@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { mkdtemp, mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve, join } from 'node:path'
-import { DEFAULT_CONFIG, normalizeConfig, loadConfig } from '../src/config.ts'
+import { DEFAULT_CONFIG, normalizeConfig, loadConfig, resolveListenTarget } from '../src/config.ts'
 
 describe('normalizeConfig', () => {
   it('undefined 返回默认值', () => {
@@ -27,7 +27,6 @@ describe('normalizeConfig', () => {
     expect(normalizeConfig({ listen: 'yes' }).listen).toBe(false)
     expect(normalizeConfig({ listenWhitelist: [1, 2] }).listenWhitelist).toEqual([])
     expect(normalizeConfig({ open: 'yes' }).open).toBe(true)
-    expect(normalizeConfig({ show: 0 }).show).toBe(true)
   })
 })
 
@@ -81,5 +80,20 @@ describe('loadConfig', () => {
     const stHome = await makeStHome()
     await writeFile(join(stHome, 'profile/default/cordis.patch.yml'), '- id: host\n  config:\n    port: 3001\n')
     expect(loadConfig(stHome).port).toBe(3001)
+  })
+})
+
+describe('resolveListenTarget', () => {
+  it('listen=false 用 cfg.host', () => {
+    expect(resolveListenTarget({ ...DEFAULT_CONFIG, host: '192.168.1.5' })).toBe('192.168.1.5')
+  })
+
+  it('listen=true 且 whitelist 非空用第一个接口', () => {
+    expect(resolveListenTarget({ ...DEFAULT_CONFIG, listen: true, listenWhitelist: ['192.168.1.5', '10.0.0.2'] }))
+      .toBe('192.168.1.5')
+  })
+
+  it('listen=true 且 whitelist 空用 0.0.0.0', () => {
+    expect(resolveListenTarget({ ...DEFAULT_CONFIG, listen: true })).toBe('0.0.0.0')
   })
 })

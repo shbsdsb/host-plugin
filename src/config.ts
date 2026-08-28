@@ -9,7 +9,6 @@ export interface HostConfig {
   listen: boolean
   listenWhitelist: string[]
   open: boolean
-  show: boolean
 }
 
 export const DEFAULT_CONFIG: HostConfig = {
@@ -18,7 +17,13 @@ export const DEFAULT_CONFIG: HostConfig = {
   listen: false,
   listenWhitelist: [],
   open: true,
-  show: true,
+}
+
+/** listen/listenWhitelist 语义 → 监听地址 */
+export function resolveListenTarget(cfg: HostConfig): string {
+  if (!cfg.listen) return cfg.host
+  if (cfg.listenWhitelist.length > 0) return cfg.listenWhitelist[0]
+  return '0.0.0.0'
 }
 
 export function normalizeConfig(raw: Record<string, unknown> | undefined): HostConfig {
@@ -33,7 +38,6 @@ export function normalizeConfig(raw: Record<string, unknown> | undefined): HostC
     cfg.listenWhitelist = raw.listenWhitelist
   }
   if (typeof raw.open === 'boolean') cfg.open = raw.open
-  if (typeof raw.show === 'boolean') cfg.show = raw.show
   return cfg
 }
 
