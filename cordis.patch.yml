@@ -1,3 +1,4 @@
-# host bundle patch:插件条目(config 覆盖挂载点)
-- id: host
-  name: './lib/index.js'
+# host bundle patch(insert 语法声明条目)
+- insert:
+  - name: host-plugin
+    id: host

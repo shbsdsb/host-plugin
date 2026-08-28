@@ -5,7 +5,20 @@
   "type": "module",
   "description": "前端基础插件 host(测试版):node:http 本地 HTTP 服务器 + st host go/close",
   "main": "lib/index.js",
-  "ts": { "bundle": { "patch": "./cordis.patch.yml" } },
+  "st": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "commands": [
+      {
+        "command": "host",
+        "file": "./lib/cli.js",
+        "explain": "Host 服务器管理(本地 HTTP 服务器)",
+        "subcommands": [
+          { "subcommand": "go", "explain": "启动 Host 服务器" },
+          { "subcommand": "close", "explain": "关闭 Host 服务器" }
+        ]
+      }
+    ]
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
