@@ -72,15 +72,38 @@ export class WebServerService {
       res.end('400 Bad Request')
       return
     }
-    // 过渡实现:精确 pathname 匹配;Task 2 替换为 exact/prefix/fallback
-    const entry = this.entries.find((e) => e.path === pathname)
-    if (!entry) {
-      res.writeHead(404, { 'content-type': 'text/plain' })
-      res.end('404 Not Found')
+    const exact = this.entries.find((e) => e.kind === 'exact' && e.path === pathname)
+    if (exact) {
+      await this.runHandler(exact.handler, pathname, req, res)
       return
     }
+    let best: Entry | null = null
+    for (const e of this.entries) {
+      if (e.kind !== 'prefix') continue
+      if (pathname === e.path || pathname.startsWith(e.path + '/')) {
+        if (!best || e.path.length > best.path.length) best = e
+      }
+    }
+    if (best) {
+      await this.runHandler(best.handler, pathname, req, res)
+      return
+    }
+    if (this.fallbackHandler) {
+      await this.runHandler(this.fallbackHandler, pathname, req, res)
+      return
+    }
+    res.writeHead(404, { 'content-type': 'text/plain' })
+    res.end('404 Not Found')
+  }
+
+  private async runHandler(
+    handler: RouteHandler,
+    pathname: string,
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
     try {
-      await entry.handler(req, res)
+      await handler(req, res)
     } catch (error) {
       console.error(`[webServer] route ${pathname} error:`, error)
       if (res.headersSent) {

@@ -73,7 +73,7 @@ describe('WebServerService 注册', () => {
   })
 })
 
-describe('WebServerService 分发(过渡:精确 pathname)', () => {
+describe('WebServerService 分发(exact / 最长 prefix / fallback)', () => {
   it('exact 命中;路径不匹配 404', async () => {
     const ws = new WebServerService()
     ws.register({ kind: 'exact', path: '/hello', handler: (_req, res) => {
@@ -171,6 +171,42 @@ describe('WebServerService 分发(过渡:精确 pathname)', () => {
     } finally {
       await ws.stop()
       spy.mockRestore()
+    }
+  })
+
+  it('prefix 路径段边界 + 最长匹配;exact/prefix/fallback 优先级', async () => {
+    const ws = new WebServerService()
+    ws.register({ kind: 'exact', path: '/api/exact', handler: (_req, res) => { res.writeHead(200); res.end('exact') } })
+    ws.register({ kind: 'prefix', path: '/api', handler: (_req, res) => { res.writeHead(200); res.end('api') } })
+    ws.register({ kind: 'prefix', path: '/api/v1', handler: (_req, res) => { res.writeHead(200); res.end('v1') } })
+    ws.registerFallback({ handler: (_req, res) => { res.writeHead(200); res.end('fallback') } })
+    const base = await startOnEphemeralPort(ws)
+    try {
+      expect(await (await fetch(base + '/api/exact')).text()).toBe('exact')   // exact 优先
+      expect(await (await fetch(base + '/api/v1/model')).text()).toBe('v1')   // 最长 prefix
+      expect(await (await fetch(base + '/api/user')).text()).toBe('api')      // 较短 prefix
+      expect(await (await fetch(base + '/api')).text()).toBe('api')           // prefix 匹配自身
+      expect(await (await fetch(base + '/apix')).text()).toBe('fallback')     // 路径段边界:/apix 不命中 /api → fallback(若越界匹配会返回 'api')
+      expect(await (await fetch(base + '/other')).text()).toBe('fallback')    // 未命中 → fallback 兜底
+    } finally {
+      await ws.stop()
+    }
+  })
+
+  it('fallback 兜底;disposer 移除后不再命中', async () => {
+    const ws = new WebServerService()
+    const disposeFallback = ws.registerFallback({ handler: (_req, res) => { res.writeHead(200); res.end('fallback') } })
+    const disposePrefix = ws.register({ kind: 'prefix', path: '/gone', handler: (_req, res) => { res.writeHead(200); res.end('gone') } })
+    const base = await startOnEphemeralPort(ws)
+    try {
+      expect(await (await fetch(base + '/anything')).text()).toBe('fallback')  // fallback 兜底
+      expect(await (await fetch(base + '/gone/x')).text()).toBe('gone')        // prefix 命中
+      disposePrefix()
+      expect(await (await fetch(base + '/gone/x')).text()).toBe('fallback')    // 移除后不再命中 → fallback 兜底
+      disposeFallback()
+      expect((await fetch(base + '/gone/x')).status).toBe(404)                 // fallback 也移除后 → 404
+    } finally {
+      await ws.stop()
     }
   })
 })
