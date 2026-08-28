@@ -59,14 +59,14 @@ describe('host plugin', () => {
     expect(name).toBe('host')
   })
 
-  it('apply 注册 ctx.host 与 ctx.webserver(默认配置)', () => {
+  it('apply 注册 ctx.host 与 ctx.webServer(默认配置)', () => {
     const ctx = makeCtx() as never
     apply(ctx as never)
     expect((ctx as { provide: ReturnType<typeof vi.fn> }).provide).toHaveBeenCalledWith(
       'host',
       expect.objectContaining({ config: DEFAULT_CONFIG }),
     )
-    expect((ctx as { provide: ReturnType<typeof vi.fn> }).provide).toHaveBeenCalledWith('webserver', expect.any(WebServerService))
+    expect((ctx as { provide: ReturnType<typeof vi.fn> }).provide).toHaveBeenCalledWith('webServer', expect.any(WebServerService))
   })
 
   it('apply 读取 $ST_HOME patch 覆盖配置', async () => {
@@ -78,12 +78,12 @@ describe('host plugin', () => {
     expect((hostCall?.[1] as { config: { port: number } }).config.port).toBe(8080)
   })
 
-  it('在真实 cordis Context 上 apply 不抛错,host/webserver 可读', () => {
+  it('在真实 cordis Context 上 apply 不抛错,host/webServer 可读', () => {
     const ctx = new Context()
     expect(() => apply(ctx as never)).not.toThrow()
     expect((ctx as unknown as { host: { config: { port: number } } }).host).toBeDefined()
     expect((ctx as unknown as { host: { config: { port: number } } }).host.config.port).toBe(3000)
-    expect((ctx as unknown as { webserver: unknown }).webserver).toBeDefined()
+    expect((ctx as unknown as { webServer: unknown }).webServer).toBeDefined()
     ctx.dispose?.()
   })
 
@@ -94,7 +94,7 @@ describe('host plugin', () => {
     const ctx = makeCtx() as never
     const ret = apply(ctx as never)
     if (ret && typeof (ret as Promise<unknown>).then === 'function') await ret
-    const wsCall = (ctx as { provide: ReturnType<typeof vi.fn> }).provide.mock.calls.find(([n]) => n === 'webserver')
+    const wsCall = (ctx as { provide: ReturnType<typeof vi.fn> }).provide.mock.calls.find(([n]) => n === 'webServer')
     const instance = wsCall?.[1] as { start: ReturnType<typeof vi.fn> }
     expect(instance.start).toHaveBeenCalledWith(8080, '127.0.0.1')
     expect(vi.mocked(execFileSync)).toHaveBeenCalled() // open 打开浏览器
@@ -107,7 +107,7 @@ describe('host plugin', () => {
     delete process.env.ST_HOME
     const ctx = makeCtx() as never
     apply(ctx as never)
-    const wsCall = (ctx as { provide: ReturnType<typeof vi.fn> }).provide.mock.calls.find(([n]) => n === 'webserver')
+    const wsCall = (ctx as { provide: ReturnType<typeof vi.fn> }).provide.mock.calls.find(([n]) => n === 'webServer')
     const instance = wsCall?.[1] as { start: ReturnType<typeof vi.fn> }
     expect(instance.start).not.toHaveBeenCalled()
   })

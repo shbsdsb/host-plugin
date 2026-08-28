@@ -9,8 +9,8 @@ declare module 'cordis' {
   interface Context {
     /** host service 骨架(配置) */
     host: { config: HostConfig }
-    /** host 提供的 HTTP 路由服务:其他插件通过 inject: ['webserver'] 注册路由 */
-    webserver: WebServerService
+    /** host 提供的 HTTP 路由服务:其他插件通过 inject: ['webServer'] 注册路由 */
+    webServer: WebServerService
   }
 }
 
@@ -23,7 +23,7 @@ export function apply(ctx: Context) {
   ctx.provide('host', { config })
 
   const webserver = new WebServerService()
-  ctx.provide('webserver', webserver)
+  ctx.provide('webServer', webserver)
   ctx.effect(() => async () => {
     await webserver.stop()
   })
