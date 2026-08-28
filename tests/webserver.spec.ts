@@ -1,5 +1,6 @@
 // agent_plugin_dev/host-plugin/tests/webserver.spec.ts
 import { describe, expect, it, vi, afterEach } from 'vitest'
+import { createConnection } from 'node:net'
 import { WebserverService } from '../src/webserver.ts'
 
 async function startOnEphemeralPort(ws: WebserverService): Promise<string> {
@@ -75,6 +76,69 @@ describe('WebserverService', () => {
     } finally {
       await a.stop()
       await b.stop()
+    }
+  })
+
+  it('畸形 URL → 400(不崩溃进程)', async () => {
+    const ws = new WebserverService()
+    const base = await startOnEphemeralPort(ws)
+    const { port } = ws.server.address() as { port: number }
+    try {
+      const status = await new Promise<number>((resolve, reject) => {
+        const sock = createConnection({ port, host: '127.0.0.1' }, () => {
+          sock.write('GET http://[::1 HTTP/1.1\r\nHost: x\r\n\r\n')
+        })
+        let data = ''
+        sock.on('data', (d) => {
+          data += d.toString()
+          const m = data.match(/^HTTP\/1\.1 (\d+)/)
+          if (m) {
+            sock.destroy()
+            resolve(Number(m[1]))
+          }
+        })
+        sock.on('error', reject)
+        setTimeout(() => { sock.destroy(); resolve(0) }, 1000)
+      })
+      expect(status).toBe(400)
+      // 进程仍存活:后续正常请求可用
+      expect((await fetch(base + '/nope')).status).toBe(404)
+    } finally {
+      await ws.stop()
+    }
+  })
+
+  it('handler async reject → 500', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const ws = new WebserverService()
+    ws.get('/async-boom', async () => {
+      throw new Error('async-boom')
+    })
+    const base = await startOnEphemeralPort(ws)
+    try {
+      const res = await fetch(base + '/async-boom')
+      expect(res.status).toBe(500)
+    } finally {
+      await ws.stop()
+      spy.mockRestore()
+    }
+  })
+
+  it('handler 已发响应头后抛错 → 销毁连接而非 500', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const ws = new WebserverService()
+    ws.get('/partial', (_req, res) => {
+      res.writeHead(200, { 'content-type': 'text/plain' })
+      res.write('partial')
+      throw new Error('boom-after-headers')
+    })
+    const base = await startOnEphemeralPort(ws)
+    try {
+      const res = await fetch(base + '/partial').catch(() => null)
+      if (res) expect(res.status).not.toBe(500)
+    } finally {
+      await ws.stop()
+      spy.mockRestore()
     }
   })
 })

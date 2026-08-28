@@ -40,7 +40,14 @@ export class WebserverService {
   }
 
   async dispatch(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const pathname = new URL(req.url ?? '/', 'http://localhost').pathname
+    let pathname: string
+    try {
+      pathname = new URL(req.url ?? '/', 'http://localhost').pathname
+    } catch {
+      res.writeHead(400, { 'content-type': 'text/plain' })
+      res.end('400 Bad Request')
+      return
+    }
     const method = req.method?.toUpperCase() ?? 'GET'
     const route = this.routes.find((r) => (r.method === 'ALL' || r.method === method) && r.path === pathname)
     if (!route) {

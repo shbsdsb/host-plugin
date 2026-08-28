@@ -38,6 +38,7 @@ export function apply(ctx: Context) {
         console.error(`Host 启动失败: ${error instanceof Error ? error.message : String(error)}`)
         process.exit(1)
       }
+      ctx.logger.info(`Host listening on http://${target}:${config.port}`)
       if (config.open) {
         try {
           execFileSync('cmd', ['/c', 'start', '', `http://${target}:${config.port}`], { stdio: 'ignore' })

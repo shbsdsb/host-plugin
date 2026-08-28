@@ -28,8 +28,9 @@ function makeCtx(config = {}): {
   host: { config: unknown }
   provide: ReturnType<typeof vi.fn>
   effect: ReturnType<typeof vi.fn>
+  logger: { info: ReturnType<typeof vi.fn> }
 } {
-  return { host: { config: {} }, provide: vi.fn(() => () => {}), effect: vi.fn() }
+  return { host: { config: {} }, provide: vi.fn(() => () => {}), effect: vi.fn(), logger: { info: vi.fn() } }
 }
 
 async function makeStHome(extra = ''): Promise<string> {
@@ -83,6 +84,9 @@ describe('host plugin', () => {
     }
     expect(instance.start).toHaveBeenCalledWith(8080, '127.0.0.1')
     expect(vi.mocked(execFileSync)).toHaveBeenCalled() // open 打开浏览器
+    expect((ctx as { logger: { info: ReturnType<typeof vi.fn> } }).logger.info).toHaveBeenCalledWith(
+      'Host listening on http://127.0.0.1:8080',
+    )
   })
 
   it('未设置 ST_HOST_START 时不启动 webserver', () => {
