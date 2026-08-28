@@ -20,7 +20,7 @@ export function apply(ctx: Context) {
   const stHome = process.env.ST_HOME ?? ''
   const profile = process.env.ST_PROFILE ?? 'default'
   const config = stHome ? loadConfig(stHome, profile) : { ...DEFAULT_CONFIG }
-  ctx.host = { config }
+  ctx.provide('host', { config })
 
   const webserver = new WebserverService()
   ctx.provide('webserver', webserver)

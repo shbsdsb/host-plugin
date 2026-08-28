@@ -3,8 +3,10 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { mkdtemp, mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve, join } from 'node:path'
+import { Context } from 'cordis'
 import { name, apply } from '../src/index.ts'
 import { WebserverService } from '../src/webserver.ts'
+import { DEFAULT_CONFIG } from '../src/config.ts'
 
 vi.mock('node:child_process', () => ({
   execFileSync: vi.fn(),
@@ -60,7 +62,10 @@ describe('host plugin', () => {
   it('apply 注册 ctx.host 与 ctx.webserver(默认配置)', () => {
     const ctx = makeCtx() as never
     apply(ctx as never)
-    expect((ctx as { host: { config: unknown } }).host).toBeDefined()
+    expect((ctx as { provide: ReturnType<typeof vi.fn> }).provide).toHaveBeenCalledWith(
+      'host',
+      expect.objectContaining({ config: DEFAULT_CONFIG }),
+    )
     expect((ctx as { provide: ReturnType<typeof vi.fn> }).provide).toHaveBeenCalledWith('webserver', expect.any(WebserverService))
   })
 
@@ -69,7 +74,17 @@ describe('host plugin', () => {
     process.env.ST_HOME = stHome
     const ctx = makeCtx() as never
     apply(ctx as never)
-    expect((ctx as { host: { config: { port: number } } }).host.config.port).toBe(8080)
+    const hostCall = (ctx as { provide: ReturnType<typeof vi.fn> }).provide.mock.calls.find(([n]) => n === 'host')
+    expect((hostCall?.[1] as { config: { port: number } }).config.port).toBe(8080)
+  })
+
+  it('在真实 cordis Context 上 apply 不抛错,host/webserver 可读', () => {
+    const ctx = new Context()
+    expect(() => apply(ctx as never)).not.toThrow()
+    expect((ctx as unknown as { host: { config: { port: number } } }).host).toBeDefined()
+    expect((ctx as unknown as { host: { config: { port: number } } }).host.config.port).toBe(3000)
+    expect((ctx as unknown as { webserver: unknown }).webserver).toBeDefined()
+    ctx.dispose?.()
   })
 
   it('ST_HOST_START=true 时启动 webserver(端口/地址来自配置)', async () => {
@@ -79,9 +94,8 @@ describe('host plugin', () => {
     const ctx = makeCtx() as never
     const ret = apply(ctx as never)
     if (ret && typeof (ret as Promise<unknown>).then === 'function') await ret
-    const instance = (ctx as { provide: ReturnType<typeof vi.fn> }).provide.mock.calls[0][1] as {
-      start: ReturnType<typeof vi.fn>
-    }
+    const wsCall = (ctx as { provide: ReturnType<typeof vi.fn> }).provide.mock.calls.find(([n]) => n === 'webserver')
+    const instance = wsCall?.[1] as { start: ReturnType<typeof vi.fn> }
     expect(instance.start).toHaveBeenCalledWith(8080, '127.0.0.1')
     expect(vi.mocked(execFileSync)).toHaveBeenCalled() // open 打开浏览器
     expect((ctx as { logger: { info: ReturnType<typeof vi.fn> } }).logger.info).toHaveBeenCalledWith(
@@ -93,9 +107,8 @@ describe('host plugin', () => {
     delete process.env.ST_HOME
     const ctx = makeCtx() as never
     apply(ctx as never)
-    const instance = (ctx as { provide: ReturnType<typeof vi.fn> }).provide.mock.calls[0][1] as {
-      start: ReturnType<typeof vi.fn>
-    }
+    const wsCall = (ctx as { provide: ReturnType<typeof vi.fn> }).provide.mock.calls.find(([n]) => n === 'webserver')
+    const instance = wsCall?.[1] as { start: ReturnType<typeof vi.fn> }
     expect(instance.start).not.toHaveBeenCalled()
   })
 })
